@@ -1,0 +1,178 @@
+---
+title: "COVID-19_case_study."
+author: "StaceyB"
+date: "`r Sys.Date()`"
+output: html_document
+bibliography: refrences.bib
+---
+
+
+
+## This is a case study for the Google Data Analytic Course
+
+
+#### My Business task: Analyze if vaccines had any effect on the number of hospitalizations or deaths in the US.
+
+The data source used is owid.covid.data provided by Our World in Data, it is open sourced and are completely open access under the Creative Commons By liscense.
+
+#### Prepare Global Environment
+ Install the tidyverse package if not already installed.
+
+```{r Global_Environment}
+if (!require("tidyverse")) {
+  install.packages("tidyverse", repos = "http://cran.rstudio.com/")
+}
+  library(lubridate)
+```
+
+
+#### Load Libraries
+ Cleaning, Transforming, Vizualizations
+
+```{r Load_Libraries}
+library(tidyr)
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+#### Load dataset
+ Remeber to load with Headers
+
+```{r Load_data}
+owid.covid.data <- read.csv("~/Desktop/owid-covid-data.csv")
+```
+
+
+## Filter the data and create samller dataframe to work with
+In this project I worked with just a subset for the United States
+
+
+```{r Filter_data}
+print(names(owid.covid.data))
+
+## now filtering for US data
+us_data <- owid.covid.data %>% 
+      filter(location == "United States")
+```
+
+#### Total number of Cases Reported in US
+
+```{r Total_cases}
+latest_date <- max(us_data$date, na.rm = TRUE)
+total_cases_latest_date <- max(us_data$total_cases[us_data$date == latest_date], na.rm = TRUE)
+print(paste("Total cases as of", latest_date, ":", total_cases_latest_date))
+```
+
+
+#### Check Date Format
+
+
+```{r checking_date_format}
+print(class(us_data$date))
+```
+
+#### Changing date formatting 
+
+```{r changing_date_format}
+us_data$date <- as.Date(us_data$date, format = "%Y-%m-%d")
+```
+
+#### Print to confirm change
+
+```{r print_date_class}
+print(class(us_data$date))
+```
+
+#### Create weekly dataframe to do correlation study
+
+```{r creating_weekly_dataframe}
+weekly_data <- us_data %>%
+  mutate(week = floor_date(date, unit = "week")) %>%  # Round down date to the nearest week
+  group_by(week) %>%
+  summarize(
+    weekly_deaths = sum(total_deaths, na.rm = TRUE),
+    weekly_hosp = sum(hosp_patients, na.rm = TRUE),
+    weekly_vaccinations = sum(total_vaccinations, na.rm = TRUE),
+    .groups = 'drop'
+  )
+```
+
+
+#### vizualize weekly data
+
+```{r Line_Graph}
+ggplot(weekly_data, aes(x = week))+
+  geom_line(aes(y = weekly_deaths, color = "deaths"))+
+  geom_line(aes(y = weekly_hosp, color = "Hospitalizations"))+
+  geom_line(aes(y = weekly_vaccinations, color = "Vaccinations"))+
+  scale_color_manual(values = c("Deaths" = "red", "Hopitalizations" = "blue", "Vaccinations" = "green"))+
+  labs(title = "Weekly COVID-19 Deaths, Hoispitalizations, and Vaccinations",
+       x = "Week",
+       y = "Count",
+       color = "Indicator")+
+  theme_minimal()
+```
+
+Note: Not a great vizualization going to explore through another vizualization
+
+
+#### Create Correlation Matrix
+
+```{r create_correlation}
+correlation_matrix <- cor(weekly_data[, c("weekly_deaths", "weekly_hosp", "weekly_vaccinations")], use = "complete.obs")
+print(correlation_matrix)
+```
+
+
+#### Vizualization of Correlation Matrix
+
+```{r Loading_corrplot}
+if (!require("corrplot")) {
+  install.packages("corrplot", repos = "http://cran.rstudio.com/")
+}
+library(corrplot)
+```
+
+
+#### Corrplot Vizualization
+
+```{r corrplot_viz}
+corrplot(correlation_matrix, method = "circle", type = "upper", order = "hclust",
+         tl.col = "black", tl.srt = 45) 
+```
+
+
+#### Creating Summary of Matrix
+
+```{r}
+## creating a summary statistic for the weekly data
+summary_stats <- summary(weekly_data)
+print(summary_stats)
+```
+
+
+## Results 
+
+#### Limitations 
+Limitations of this dataset are that there are too many other variables that can factor into the results. With this dataset variables that could not be accounted for were: the scale of the pandemic at any given time, initial high death rates, pandemic waves, or distribution of the vaccine. 
+
+#### Discussion
+Discussion: The correlation between deaths and hospitalizations -0.1301442): There is a very weak negative correlation between deaths and hospitalizations which means that as one goes up the other goes down. Almost no correlation exist in this data set.
+
+The correlation between vaccines and death (0.3935970):This is moderate positive correlation suggesting that as one goes up so does the other. This seems counter intuitive, as is common knowledge vaccines should cause the rate of death to decrease, but as discussed it does not account for many other variables such as initial high death rate, pandemic waves, accelerating vaccine efforts or both metrics increasing due to the scale of the pandemic.
+
+The correlation between hospitalizations and vaccines (0.1838125):This represents a weak positive correlation where as vaccines increased so did hospitalizations. As stated above that could have included many other variables. 
+
+**Correlation does not imply Causation:**
+The relationships in these correlations does not mean that one caused the other. The data must be examined in context. 
+
+**Causation vs. Correlation:** 
+It is crucial to note that correlation does not imply causation. The relationships indicated by these correlation coefficients do not mean that one variable causes changes in another. For instance, while vaccinations are designed to reduce the severity and frequency of illness, their correlation with deaths and hospitalizations can be influenced by various factors including timing, vaccine distribution, and pandemic waves.
+
+**Contextual Factors:**
+Consider the context in which data was collected. High correlations during specific periods might coincide with particular events, such as the start of vaccination campaigns, public health policy changes, or variants of concern.
+
+## Further Study
+While we calculated some correlation between these factors, there were severe limitations to using this dataset for a correlation. More information would be needed to understand the context of these correlations. Further studies could include regression models, time series models or stratified studies to explore causation links. 
+
